@@ -43,7 +43,8 @@ export default function Detail() {
   const num = (x) => Number(x || 0);
   const out = num(fin?.outstanding); const dpAmt = num(b.total_amount) * num(st.dp_percent) / 100;
   const product = b.tour_packages?.name || (b.booking_type === 'rental' ? 'Rental mobil' : 'Custom tour');
-  const active = !['Cancelled', 'Completed'].includes(b.status);
+  const active = !['Cancelled', 'Completed'].includes(b.status); // masih bisa dibatalkan
+  const editable = b.status !== 'Cancelled'; // pembayaran, status, dan detail tetap bisa diubah setelah Completed
 
   function refundPreview() {
     const d = Math.round((new Date(b.start_date) - new Date(todayISO())) / 864e5);
@@ -105,7 +106,7 @@ export default function Detail() {
         {b.pickup_location && <div>Jemput: {b.pickup_location}</div>}{b.destination && <div>Tujuan: {b.destination}</div>}
         {b.itinerary && <div className="whitespace-pre-line muted">{b.itinerary}</div>}{b.notes && <div className="muted">Catatan: {b.notes}</div>}
         {b.status === 'Cancelled' && <div className="text-ember">Dibatalkan: {b.cancel_reason || '-'}</div>}
-        {active && !edit && <button className="btn btn-ghost btn-sm mt-2" onClick={() => setEdit({ ...b })}>Ubah detail</button>}
+        {editable && !edit && <button className="btn btn-ghost btn-sm mt-2" onClick={() => setEdit({ ...b })}>Ubah detail</button>}
       </section>
       {edit && (<form className="card space-y-3" onSubmit={(e) => { e.preventDefault(); const p = {}; EDIT.forEach((f) => { const v = edit[f.name]; p[f.name] = f.type === 'number' ? (v === '' || v == null ? (f.name === 'pax' ? null : 0) : Number(v)) : v === '' ? null : v; });
         run(() => supabase.from('bookings').update(p).eq('id', id), 'Tersimpan.').then(() => setEdit(null)); }}>
@@ -117,7 +118,7 @@ export default function Detail() {
           <div key={t} className="flex justify-between"><span className="text-muted">{t}</span><b>{rp(v)}</b></div>))}
         <div className="flex justify-between border-t border-line pt-2"><span className="font-bold">Laba</span><b className={num(fin?.profit) < 0 ? 'text-ember' : 'text-green-800'}>{rp(fin?.profit)}</b></div></section>
 
-      {active && (<section className="card space-y-2"><label htmlFor="stt" className="lbl">Ubah status</label>
+      {editable && (<section className="card space-y-2"><label htmlFor="stt" className="lbl">Ubah status</label>
         <select id="stt" className="inp" value={b.status} onChange={(e) => setStatus(e.target.value)}>{NEXT.map((s) => <option key={s}>{s}</option>)}</select></section>)}
 
       <section className="card space-y-3"><div className="font-bold">Pembayaran</div>
@@ -128,7 +129,7 @@ export default function Detail() {
             {p.proof_path && <button className="btn btn-ghost btn-sm" onClick={() => viewProof(p.proof_path)}>Bukti</button>}
             {p.status === 'Pending' && <><button className="btn btn-sm" onClick={() => run(() => supabase.from('payments').update({ status: 'Verified' }).eq('id', p.id), 'Terverifikasi.')}>Verifikasi</button>
               <button className="btn btn-ghost btn-sm" onClick={() => run(() => supabase.from('payments').update({ status: 'Rejected' }).eq('id', p.id))}>Tolak</button></>}</div></div>))}
-        {active && (<form onSubmit={addPayment} className="grid gap-2 border-t border-line pt-3 md:grid-cols-4">
+        {editable && (<form onSubmit={addPayment} className="grid gap-2 border-t border-line pt-3 md:grid-cols-4">
           <select className="inp" aria-label="Jenis" value={pf.payment_type} onChange={(e) => setPf({ ...pf, payment_type: e.target.value })}><option>DP</option><option>Pelunasan</option><option>Cicilan</option></select>
           <input className="inp" type="number" placeholder={`Nominal (saran ${pays.length ? out : dpAmt})`} aria-label="Nominal" required value={pf.amount} onChange={(e) => setPf({ ...pf, amount: e.target.value })} />
           <select className="inp" aria-label="Metode" value={pf.method} onChange={(e) => setPf({ ...pf, method: e.target.value })}><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="qris">QRIS</option></select>
