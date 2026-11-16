@@ -4,9 +4,12 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { rp, todayISO, days } from '@/lib/format';
 import { Err } from '@/components/ui';
+import { useMe } from '@/components/Frame';
 
 export default function NewBooking() {
   const router = useRouter();
+  const me = useMe();
+  const [req, setReq] = useState(null);
   const [cs, setCs] = useState([]); const [vs, setVs] = useState([]); const [ps, setPs] = useState([]); const [cats, setCats] = useState([]);
   const [dpPct, setDpPct] = useState(50); const [busyV, setBusyV] = useState([]);
   const [f, setF] = useState({ customer_id: '', new_name: '', new_wa: '', booking_type: 'package', package_id: '', vehicle_id: '', service_type: 'with_driver',
@@ -26,6 +29,19 @@ export default function NewBooking() {
       setCs(a.data || []); setVs(b.data || []); setPs(c.data || []); setCats((d.data || []).map((x) => x.name)); if (e.data) setDpPct(Number(e.data.dp_percent));
     })();
   }, []);
+  useEffect(() => {
+    const rid = new URLSearchParams(window.location.search).get('request');
+    if (rid) supabase.from('booking_requests').select('*').eq('id', rid).single().then(({ data }) => { if (data) setReq(data); });
+  }, []);
+  useEffect(() => {
+    if (!req) return;
+    const dg = (x) => String(x || '').replace(/\D/g, '').replace(/^0/, '62');
+    const m = cs.find((c) => c.whatsapp && dg(c.whatsapp) === dg(req.whatsapp));
+    const note = `[${req.ref_code}] ${req.message || ''}${req.vehicle_type ? ' Tipe diminta: ' + req.vehicle_type + '.' : ''}${req.email ? ' Email: ' + req.email + '.' : ''}`.trim();
+    setF((o) => ({ ...o, customer_id: m ? m.id : 'new', new_name: req.name, new_wa: req.whatsapp, booking_type: req.request_type, package_id: req.package_id || '',
+      service_type: req.service_type || 'with_driver', start_date: req.start_date, end_date: req.end_date, pax: req.pax ? String(req.pax) : '',
+      pickup_location: req.pickup_location || '', destination: req.destination || '', notes: note }));
+  }, [req, cs.length]);
   useEffect(() => {
     supabase.from('bookings').select('vehicle_id').neq('status', 'Cancelled').not('vehicle_id', 'is', null)
       .lte('start_date', f.end_date).gte('end_date', f.start_date).then(({ data }) => setBusyV((data || []).map((r) => r.vehicle_id)));
@@ -67,6 +83,7 @@ export default function NewBooking() {
       if (Number(f.rental_cost) > 0) costs.push({ category: 'Sewa unit partner', description: veh ? `${veh.type_name} ${veh.plate_no}` : null, qty: 1, unit_price: Number(f.rental_cost), supplier_id: veh?.supplier_id || null });
       extra.forEach((x) => { if (x.unit_price) costs.push({ category: x.category, description: x.description || null, qty: Number(x.qty || 1), unit_price: Number(x.unit_price) }); });
       if (costs.length) { const { error: e2 } = await supabase.from('booking_costs').insert(costs.map((c) => ({ ...c, booking_id: b.id, kind: 'planned' }))); if (e2) throw e2; }
+      if (req) await supabase.from('booking_requests').update({ status: 'Converted', converted_booking_id: b.id, handled_by: me.id, handled_at: new Date().toISOString() }).eq('id', req.id);
       router.push('/bookings/' + b.id);
     } catch (ex) { setErr(ex.code === '23P01' ? 'Plat ini sudah dipesan di tanggal tersebut. Pilih unit lain.' : ex.message); }
     finally { setSaving(false); }
@@ -77,6 +94,7 @@ export default function NewBooking() {
   return (
     <form onSubmit={submit} className="space-y-3">
       <h1 className="h1">Booking baru</h1>
+      {req && <div className="card muted">Dari permintaan website <b>{req.ref_code}</b>. Periksa data lalu pilih unit mobil.</div>}
       <section className="card space-y-3"><div className="font-bold">Pelanggan</div>
         <select className="inp" aria-label="Pelanggan" value={f.customer_id} onChange={(e) => set('customer_id', e.target.value)}>
           <option value="">— pilih pelanggan —</option><option value="new">+ Pelanggan baru</option>{cs.map((c) => <option key={c.id} value={c.id}>{c.name}{c.whatsapp ? ' · ' + c.whatsapp : ''}</option>)}</select>

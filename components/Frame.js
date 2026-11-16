@@ -8,7 +8,7 @@ import Logo from './Logo';
 const Ctx = createContext(null);
 export const useMe = () => useContext(Ctx);
 const MAIN = [['/', 'Beranda'], ['/bookings', 'Booking'], ['/calendar', 'Kalender'], ['/finance', 'Keuangan']];
-const MORE = [['/customers', 'Pelanggan'], ['/vehicles', 'Mobil'], ['/suppliers', 'Partner'], ['/packages', 'Paket Tour'], ['/backup', 'Backup'], ['/account', 'Akun']];
+const MORE = [['/requests', 'Permintaan Masuk'], ['/customers', 'Pelanggan'], ['/vehicles', 'Mobil'], ['/suppliers', 'Partner'], ['/packages', 'Paket Tour'], ['/website', 'Website'], ['/backup', 'Backup'], ['/account', 'Akun']];
 
 export default function Frame({ children }) {
   const path = usePathname();
@@ -25,7 +25,7 @@ export default function Frame({ children }) {
     let alive = true;
     async function check() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { if (alive) { setMe(null); setReady(true); } if (path !== '/login') router.replace('/login'); return; }
+      if (!session) { if (alive) { setMe(null); setReady(true); } if (path !== '/login' && !path.startsWith('/pesan')) router.replace('/login'); return; }
       const { data: p } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
       if (!p || !p.is_active) { await supabase.auth.signOut(); return; }
       if (alive) { setMe(p); setReady(true); }
@@ -36,7 +36,7 @@ export default function Frame({ children }) {
   }, [path]);
 
   useEffect(() => setOpen(false), [path]);
-  if (path === '/login') return children;
+  if (path === '/login' || path.startsWith('/pesan')) return children;
   if (!ready || !me) return <div className="p-8 text-center muted">Memuat…</div>;
 
   const on = (h) => (h === '/' ? path === '/' : path.startsWith(h));

@@ -21,7 +21,9 @@ export default function Dashboard() {
   const [bk, setBk] = useState([]);
   const [fin, setFin] = useState({});
   const [err, setErr] = useState('');
+  const [newReq, setNewReq] = useState(0);
   useEffect(() => {
+    supabase.from('booking_requests').select('id', { count: 'exact', head: true }).eq('status', 'New').then(({ count }) => setNewReq(count || 0));
     (async () => {
       const [a, b] = await Promise.all([
         supabase.from('bookings').select('id,booking_no,status,start_date,end_date,booking_type,customers(name),vehicles(plate_no),tour_packages(name)'),
@@ -45,6 +47,7 @@ export default function Dashboard() {
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h1 className="h1">Beranda</h1><Link href="/bookings/new" className="btn btn-ember btn-sm">+ Booking baru</Link></div>
       <Err>{err}</Err>
+      {newReq > 0 && <Link href="/requests" className="card flex items-center justify-between !border-ember"><span className="font-semibold">Permintaan booking baru dari website</span><span className="chip bg-ember text-white">{newReq}</span></Link>}
       <div className="flex flex-wrap gap-2">{PERIODS.map(([k, t]) => (
         <button key={k} onClick={() => setP(k)} className={`chip ${p === k ? 'bg-sea text-white' : 'bg-stone-200 text-stone-800'}`}>{t}</button>))}</div>
       {p === 'custom' && <div className="flex gap-2"><input type="date" aria-label="Dari" className="inp" value={cu[0]} onChange={(e) => setCu([e.target.value, cu[1]])} />
